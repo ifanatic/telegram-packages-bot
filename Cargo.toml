@@ -3,6 +3,10 @@ name = "packagesbot"
 version = "0.1.0"
 authors = ["Nikolay Oshnurov <onlk@yandex.ru>"]
 
+[lib]
+name = "packagesbot"
+path = "src/lib.rs"
+
 [[bin]]
 doc = false
 name = "packagesbot"

@@ -1,4 +1,6 @@
 FROM ifanatic/rustssl
 MAINTAINER Nikolay Oshnurov "onlk@yandex.ru"
-ADD . /rust
-RUN cargo build --verbose
+
+ADD ./target/release/packagesbot /opt/packagesbot
+
+ENTRYPOINT /opt/packagesbot
