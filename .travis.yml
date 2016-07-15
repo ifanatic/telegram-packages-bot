@@ -12,7 +12,7 @@ script:
 
 after_success:
   - if [ "$TRAVIS_BRANCH" == "master" ]; then
-    docker build -t "$DOCKER_DEPLOY_HOST/$DOCKER_IMAGE_NAME" .
+    docker build -t "$DOCKER_DEPLOY_HOST/$DOCKER_IMAGE_NAME" .;
     docker login -e="$DOCKER_EMAIL" -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD" "$DOCKER_DEPLOY_HOST";
     docker push "$DOCKER_DEPLOY_HOST/$DOCKER_IMAGE_NAME";
     fi
