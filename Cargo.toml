@@ -1,0 +1,19 @@
+[package]
+name = "packagesbot"
+version = "0.1.0"
+authors = ["Nikolay Oshnurov <onlk@yandex.ru>"]
+
+[[bin]]
+doc = false
+name = "packagesbot"
+path = "src/bin/server.rs"
+
+[dependencies]
+env_logger = "0.3.3"
+hyper = "0.9.9"
+log = "0.3.6"
+marksman_escape = "0.1.2"
+quick-error = "1.1.0"
+rustc-serialize = "0.3.19"
+telegram-bot = "0.4.2"
+url = "1.1.1"
