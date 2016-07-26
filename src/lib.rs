@@ -15,8 +15,6 @@ extern crate tendril;
 extern crate threadpool;
 extern crate url;
 
-use std::collections::BTreeMap;
-
 mod crates;
 mod error;
 mod godoc;

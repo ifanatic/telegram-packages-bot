@@ -1,12 +1,11 @@
 use std::borrow::ToOwned;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
 use std::ops::Deref;
 use std::iter::Iterator;
 use std::sync::Arc;
 use regex::Regex;
-use telegram_bot::{self, Api, ListeningAction, ListeningMethod, MessageType};
-use telegram_bot::types::{Integer, ParseMode, User};
+use telegram_bot::{Api, ListeningAction, ListeningMethod, MessageType};
+use telegram_bot::types::{Integer, ParseMode};
 use threadpool::ThreadPool;
 use telegram::botanio::Botan;
 use telegram::html::HtmlMessageBuilder;
@@ -20,12 +19,12 @@ lazy_static!(
 );
 
 #[derive(Debug, RustcEncodable)]
-struct StatsMessage {
+struct SearchStatsMessage {
     query: String,
 }
 
 #[derive(Clone)]
-struct BotContext<'a> {
+pub struct BotContext<'a> {
     api: &'a Api,
     tracker: &'a Botan,
 }
@@ -39,21 +38,23 @@ impl<'a> BotContext<'a> {
     }
 }
 
-struct RequestContext<'a> {
+pub struct RequestContext<'a> {
     bot_ctx: BotContext<'a>,
     chat_id: i64,
+    uid: i64,
 }
 
 impl<'a> RequestContext<'a> {
-    fn new(bot_ctx: BotContext<'a>, cid: i64) -> RequestContext<'a> {
+    fn new(bot_ctx: BotContext<'a>, cid: i64, uid: i64) -> RequestContext<'a> {
         RequestContext {
             bot_ctx: bot_ctx,
             chat_id: cid,
+            uid: uid,
         }
     }
 }
 
-struct Command<'a> {
+pub struct Command<'a> {
     name: &'a str,
     query: &'a str,
 }
@@ -72,7 +73,7 @@ impl<'a> Command<'a> {
     }
 }
 
-trait CommandHandler {
+pub trait CommandHandler {
     fn handle(&self, ctx: &RequestContext, cmd: &Command) -> Result<(), Error>;
 }
 
@@ -148,10 +149,21 @@ impl SearchHandler {
 
         msg_builder.build()
     }
-}
 
-impl CommandHandler for SearchHandler {
-    fn handle(&self, ctx: &RequestContext, cmd: &Command) -> Result<(), Error> {
+    fn track(&self, ctx: &RequestContext, cmd: &Command) {
+        let query = String::from(cmd.query);
+        let uid = ctx.uid;
+        let tracker = ctx.bot_ctx.tracker.clone();
+
+        self.pool.execute(move || {
+            let msg = SearchStatsMessage { query: query.clone() };
+            if let Err(err) = tracker.track(uid, "search", &msg) {
+                error!("{:?}", err);
+            }
+        });
+    }
+
+    fn search(&self, ctx: &RequestContext, cmd: &Command) {
         let repo = self.repo.clone();
         let query = String::from(cmd.query);
         let api = ctx.bot_ctx.api.clone();
@@ -169,6 +181,13 @@ impl CommandHandler for SearchHandler {
                 error!("{:?}", err);
             }
         });
+    }
+}
+
+impl CommandHandler for SearchHandler {
+    fn handle(&self, ctx: &RequestContext, cmd: &Command) -> Result<(), Error> {
+        self.track(ctx, cmd);
+        self.search(ctx, cmd);
 
         Ok(())
     }
@@ -205,11 +224,13 @@ pub trait Bot {
 
         let res = listener.listen(|u| {
             if let Some(m) = u.message {
-                let req_ctx = RequestContext::new(ctx.clone(), m.chat.id());
+                let req_ctx = RequestContext::new(ctx.clone(), m.chat.id(), m.from.id);
 
                 match m.msg {
                     MessageType::Text(text) => {
-                        self.handle(&req_ctx, &text);
+                        if let Err(err) = self.handle(&req_ctx, &text) {
+                            error!("{:?}", err);
+                        }
                     }
                     _ => {}
                 }
@@ -228,7 +249,6 @@ pub struct PkgsBot {
     api: Api,
     botan: Botan,
     handlers: BTreeMap<String, Box<CommandHandler>>,
-    pool: Arc<ThreadPool>,
 }
 
 impl PkgsBot {
@@ -250,7 +270,6 @@ impl PkgsBot {
             api: api,
             botan: botan,
             handlers: handlers,
-            pool: pool,
         })
     }
 
