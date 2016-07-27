@@ -5,6 +5,7 @@ use hyper::header::{ContentType, Headers};
 use hyper::Url;
 use rustc_serialize::Decodable;
 use rustc_serialize::json;
+use {SearchRepo, Package};
 use error::Error;
 
 const CRATES_API_ENDPOINT: &'static str = "https://crates.io/api/v1/crates";
@@ -47,6 +48,7 @@ struct Meta {
     total: i64,
 }
 
+#[derive(Clone)]
 pub struct CratesRepo {}
 
 fn api_request_headers() -> Headers {
@@ -67,8 +69,8 @@ fn from_api_response<T: Decodable>(mut resp: Response) -> Result<T, Error> {
     json::decode(&data).map_err(|e| Error::from(e))
 }
 
-impl CratesRepo {
-    pub fn search(&self, query: &str) -> Result<Vec<EncodableCrate>, Error> {
+impl SearchRepo for CratesRepo {
+    fn search(&self, query: &str) -> Result<Vec<Package>, Error> {
         let mut endpoint = Url::parse(CRATES_API_ENDPOINT).unwrap();
         endpoint.query_pairs_mut().append_pair("q", query);
         endpoint.query_pairs_mut().append_pair("page", "1");
@@ -77,7 +79,18 @@ impl CratesRepo {
         let resp = try!(execute_api_request(endpoint));
         let r: R = try!(from_api_response(resp));
 
-        Ok(r.crates)
+        let crates: Vec<Package> = r.crates
+            .into_iter()
+            .map(|krate| {
+                Package {
+                    name: krate.name,
+                    repository: krate.repository,
+                    description: krate.description,
+                }
+            })
+            .collect();
+
+        Ok(crates)
     }
 }
 
