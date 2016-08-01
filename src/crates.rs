@@ -59,7 +59,7 @@ fn api_request_headers() -> Headers {
 
 fn execute_api_request<U: IntoUrl>(url: U) -> Result<Response, Error> {
     let client = Client::new();
-    client.get(url).headers(api_request_headers()).send().map_err(|err| Error::from(err))
+    client.get(url).headers(api_request_headers()).send().map_err(Error::from)
 }
 
 fn from_api_response<T: Decodable>(mut resp: Response) -> Result<T, Error> {
@@ -85,6 +85,7 @@ impl SearchRepo for CratesRepo {
                 Package {
                     name: krate.name,
                     repository: krate.repository,
+                    documentation: krate.documentation,
                     description: krate.description,
                 }
             })

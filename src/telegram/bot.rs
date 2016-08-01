@@ -4,6 +4,7 @@ use std::ops::Deref;
 use std::iter::Iterator;
 use std::sync::Arc;
 use regex::Regex;
+use rustc_serialize::{Encodable, Decodable};
 use telegram_bot::{Api, ListeningAction, ListeningMethod, MessageType};
 use telegram_bot::types::{Integer, ParseMode};
 use threadpool::ThreadPool;
@@ -17,6 +18,11 @@ const SEARCH_WORKERS_COUNT: usize = 4;
 lazy_static!(
     static ref COMMAND_RE: Regex = Regex::new(r"/(\w+)\s*(.*)").unwrap();
 );
+
+trait StateStore {
+    fn save<S: Encodable>(&self, uid: i64, cid: i64);
+    fn load<M: Decodable>(&self, uid: i64, cid: i64);
+}
 
 #[derive(Debug, RustcEncodable)]
 struct SearchStatsMessage {
@@ -102,12 +108,12 @@ impl SearchHandler {
         Ok(())
     }
 
-    fn send_packages(api: &Api, chat_id: Integer, packages: &Vec<Package>) -> Result<(), Error> {
+    fn send_packages(api: &Api, chat_id: Integer, packages: &[Package]) -> Result<(), Error> {
 
         let mut msg = String::with_capacity(1024);
 
-        for pkg in packages.iter().take(50) {
-            let msg_part = SearchHandler::prepare_message_text(&pkg);
+        for pkg in packages.iter().take(10) {
+            let msg_part = SearchHandler::prepare_message_text(pkg);
 
             if msg.len() + msg_part.len() >= MAX_MESSAGE_LENGTH {
                 break;
@@ -116,7 +122,7 @@ impl SearchHandler {
             msg.push_str(&msg_part);
         }
 
-        try!(api.send_message(chat_id, msg, Some(ParseMode::Html), None, None, None));
+        try!(api.send_message(chat_id, msg, Some(ParseMode::Html), Some(true), None, None));
 
         Ok(())
     }
@@ -126,25 +132,33 @@ impl SearchHandler {
             Some(ref desc) => desc,
             None => "",
         };
-        let url: &str = match pkg.repository {
+        let repo_url: &str = match pkg.repository {
             Some(ref u) => u,
             None => "",
         };
-        SearchHandler::render_html_message(&pkg.name, description, url)
+        let doc_url: &str = match pkg.documentation {
+            Some(ref u) => u,
+            None => "",
+        };
+        SearchHandler::render_html_message(&pkg.name, description, repo_url, doc_url)
     }
 
-    fn render_html_message(name: &str, description: &str, url: &str) -> String {
+    fn render_html_message(name: &str, description: &str, url: &str, doc_url: &str) -> String {
         let mut msg_builder = HtmlMessageBuilder::new();
         {
             msg_builder.name(name);
         }
 
-        if description.len() > 0 {
+        if !description.is_empty() {
             msg_builder.description(description);
         }
 
-        if url.len() > 0 {
-            msg_builder.url(url);
+        if !url.is_empty() {
+            msg_builder.repo_url(url);
+        }
+
+        if !doc_url.is_empty() {
+            msg_builder.doc_url(doc_url);
         }
 
         msg_builder.build()
@@ -173,7 +187,7 @@ impl SearchHandler {
             let search_result = repo.search(&query);
             let send_result = match search_result {
                 Ok(ref pkgs) if !pkgs.is_empty() => {
-                    SearchHandler::send_packages(&api, chat_id, &pkgs)
+                    SearchHandler::send_packages(&api, chat_id, pkgs)
                 }
                 _ => SearchHandler::send_empty_result(&api, chat_id),
             };
@@ -226,13 +240,10 @@ pub trait Bot {
             if let Some(m) = u.message {
                 let req_ctx = RequestContext::new(ctx.clone(), m.chat.id(), m.from.id);
 
-                match m.msg {
-                    MessageType::Text(text) => {
-                        if let Err(err) = self.handle(&req_ctx, &text) {
+                if let MessageType::Text(text) = m.msg {
+                    if let Err(err) = self.handle(&req_ctx, &text) {
                             error!("{:?}", err);
                         }
-                    }
-                    _ => {}
                 }
             }
 

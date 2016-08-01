@@ -35,8 +35,8 @@ impl From<telegram_bot::Error> for Error {
 
 impl Debug for Error {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        match self {
-            &Error::General(ref msg) => write!(f, "error: {}", msg).unwrap(),
+        match *self {
+            Error::General(ref msg) => write!(f, "error: {}", msg).unwrap(),
         };
 
         Ok(())
@@ -45,8 +45,8 @@ impl Debug for Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        match self {
-            &Error::General(ref msg) => write!(f, "error: {}", msg).unwrap(),
+        match *self {
+            Error::General(ref msg) => write!(f, "error: {}", msg).unwrap(),
         };
 
         Ok(())
@@ -55,8 +55,8 @@ impl Display for Error {
 
 impl StdError for Error {
     fn description(&self) -> &str {
-        match self {
-            &Error::General(ref msg) => msg,
+        match *self {
+            Error::General(ref msg) => msg,
         }
     }
 }

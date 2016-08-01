@@ -37,12 +37,10 @@ impl GodocRepo {
     }
 
     fn parse_packages_table<'a>(&self, tbody: &Node<'a>) -> Vec<Package> {
-        let pkgs: Vec<Package> = tbody.find(Name("tr"))
+        tbody.find(Name("tr"))
             .iter()
             .filter_map(|n| self.parse_packages_row(&n))
-            .collect();
-
-        pkgs
+            .collect::<Vec<Package>>()
     }
 
     fn parse_packages_row<'a>(&self, tr: &Node<'a>) -> Option<Package> {
@@ -50,8 +48,14 @@ impl GodocRepo {
 
         if let Some(n) = tr.find(Name("a")).first() {
             pkg.name = n.text();
-            pkg.repository =
-                n.attr("href").or(Some("")).map(|r| r.trim_left_matches('/').to_owned());
+
+            if let Some(repourl) = n.attr("href") {
+                let repo = repourl.trim_left_matches('/');
+
+                let docurl = format!("http://godoc.org/{}", repo);
+                pkg.repository = Some(repo.to_owned());
+                pkg.documentation = Some(docurl);
+            }
         } else {
             return None;
         }
@@ -62,7 +66,7 @@ impl GodocRepo {
             return None;
         }
 
-        if pkg.name.len() > 0 {
+        if !pkg.name.is_empty() {
             Some(pkg)
         } else {
             None
