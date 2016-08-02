@@ -1,9 +1,12 @@
-#[macro_use]
 extern crate log;
-extern crate env_logger;
+#[macro_use]
+extern crate slog;
+extern crate slog_stdlog;
+extern crate slog_term;
 extern crate packagesbot;
 
 use std::env;
+use slog::*;
 
 struct EnvConfig {
     telegram_token: String,
@@ -23,7 +26,10 @@ impl EnvConfig {
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    let logger = Logger::new_root(o!());
+    logger.set_drain(slog_term::async_stderr());
+
+    slog_stdlog::set_logger_level(logger, log::LogLevelFilter::Debug).unwrap();
 
     let conf = EnvConfig::load();
 

@@ -4,7 +4,6 @@ extern crate env_logger;
 extern crate hyper;
 #[macro_use]
 extern crate lazy_static;
-extern crate marksman_escape;
 #[macro_use]
 extern crate quick_error;
 extern crate regex;
@@ -23,6 +22,7 @@ mod telegram;
 pub struct Package {
     pub name: String,
     pub repository: Option<String>,
+    pub documentation: Option<String>,
     pub description: Option<String>,
 }
 
@@ -31,6 +31,7 @@ impl Package {
         Package {
             name: String::new(),
             repository: None,
+            documentation: None,
             description: None,
         }
     }
